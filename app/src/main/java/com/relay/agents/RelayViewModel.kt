@@ -10,6 +10,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -193,10 +196,10 @@ class RelayViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val list = agents.filter { it.enabled && !it.provider.manual }
-                val res = kotlinx.coroutines.coroutineScope {
+                val res = coroutineScope {
                     list.map { a ->
-                        kotlinx.coroutines.async { a.id to ClaudeClient.send(a, "Reply with the single word: ok", "ping", 16) }
-                    }.let { jobs -> jobs.map { it.await() } }
+                        async { a.id to ClaudeClient.send(a, "Reply with the single word: ok", "ping", 16) }
+                    }.awaitAll()
                 }
                 health = res.associate { (id, r) ->
                     id to when (r) {
