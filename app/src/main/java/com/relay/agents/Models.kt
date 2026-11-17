@@ -87,18 +87,21 @@ data class Step(
     val title: String,
     val status: StepStatus = StepStatus.PENDING,
     val result: String = "",
-    val doneBy: String = ""
+    val doneBy: String = "",
+    /** معرّف وكيل مثبّت لهذه الخطوة؛ فارغ = حسب الأدوار والاستراتيجية. */
+    val assignee: String = ""
 ) {
     fun toJson() = JSONObject()
         .put("title", title).put("status", status.name)
-        .put("result", result).put("doneBy", doneBy)
+        .put("result", result).put("doneBy", doneBy).put("assignee", assignee)
 
     companion object {
         fun fromJson(o: JSONObject) = Step(
             o.getString("title"),
             StepStatus.valueOf(o.optString("status", "PENDING")),
             o.optString("result"),
-            o.optString("doneBy")
+            o.optString("doneBy"),
+            o.optString("assignee")
         )
     }
 }

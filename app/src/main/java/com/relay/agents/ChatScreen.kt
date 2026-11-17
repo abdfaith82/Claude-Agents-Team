@@ -1,5 +1,6 @@
 package com.relay.agents
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,10 +32,23 @@ fun ChatTab(vm: RelayViewModel, onOpenRun: () -> Unit) {
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                modeLabel(vm.chatMode) + " • " + (if (vm.chatInclude.isEmpty()) tr("كل الوكلاء") else trf("%s وكيل", vm.chatInclude.size)),
-                style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f), maxLines = 1
+            var picker by remember { mutableStateOf(false) }
+            AssistChip(
+                onClick = { picker = true },
+                leadingIcon = { StatusDot(Brand.Green, 8) },
+                label = {
+                    Text(
+                        when (vm.chatInclude.size) {
+                            0 -> tr("تلقائي")
+                            1 -> vm.agents.firstOrNull { it.id == vm.chatInclude.first() }?.name ?: tr("تلقائي")
+                            else -> trf("%s وكيل", vm.chatInclude.size)
+                        } + " ⌄",
+                        maxLines = 1
+                    )
+                }
             )
+            Text(modeLabel(vm.chatMode), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 1)
+            if (picker) ModelPicker(vm) { picker = false }
             TextButton(onClick = { panel = !panel }) { Text(if (panel) tr("إخفاء التنسيق") else tr("🎛️ التنسيق")) }
             TextButton(enabled = msgs.isNotEmpty(), onClick = { vm.clearChat() }) { Text(tr("مسح")) }
         }
@@ -46,6 +60,8 @@ fun ChatTab(vm: RelayViewModel, onOpenRun: () -> Unit) {
                 Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("✳️", style = MaterialTheme.typography.displaySmall)
+                    Text(tr("ماذا يدور في ذهنك؟"), style = MaterialTheme.typography.headlineSmall)
+                    Text(trf("%s نموذج جاهز", vm.agents.count { it.enabled }), style = MaterialTheme.typography.labelLarge, color = Brand.GreenDark)
                     Text(tr("اسأل أو اطلب. يجيبك فريق النماذج ويتبدّل تلقائياً عند توقف أحدها."),
                         style = MaterialTheme.typography.bodyMedium)
                     Text(tr("اكتب /task ثم الهدف لبدء مهمة تنسيق كاملة بنقاط استئناف."),
@@ -170,4 +186,35 @@ private fun Bubble(m: ChatMsg) {
             }
         }
     }
+}
+
+/** منتقي النموذج: «تلقائي» أو وكيل واحد بعينه. */
+@Composable
+private fun ModelPicker(vm: RelayViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("اختر نموذجاً")) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("تم")) } },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                item {
+                    ListItem(
+                        headlineContent = { Text(tr("تلقائي")) },
+                        supportingContent = { Text(tr("أذكى وكيل جاهز، مع تبديل تلقائي")) },
+                        trailingContent = { if (vm.chatInclude.isEmpty()) Text("✓") },
+                        modifier = Modifier.clickable { vm.pickChatAgent(null); onDismiss() }
+                    )
+                }
+                items(vm.agents.filter { it.enabled && !it.provider.manual }, key = { it.id }) { a ->
+                    ListItem(
+                        headlineContent = { Text(a.name, maxLines = 1) },
+                        supportingContent = { Text(a.provider.label + " · " + a.model.take(30), maxLines = 1) },
+                        leadingContent = { ProviderBadge(a.provider.label, 36) },
+                        trailingContent = { if (a.id in vm.chatInclude) Text("✓") },
+                        modifier = Modifier.clickable { vm.pickChatAgent(a.id); onDismiss() }
+                    )
+                }
+            }
+        }
+    )
 }

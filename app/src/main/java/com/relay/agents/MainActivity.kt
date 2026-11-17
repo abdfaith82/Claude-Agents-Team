@@ -1,6 +1,7 @@
 package com.relay.agents
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -65,17 +66,10 @@ class MainActivity : ComponentActivity() {
                 "light" -> false
                 else -> isSystemInDarkTheme()
             }
-            val ctx = LocalContext.current
-            val scheme = when {
-                Build.VERSION.SDK_INT >= 31 && dark -> dynamicDarkColorScheme(ctx)
-                Build.VERSION.SDK_INT >= 31 -> dynamicLightColorScheme(ctx)
-                dark -> darkColorScheme()
-                else -> lightColorScheme()
-            }
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (I18n.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             ) {
-                MaterialTheme(colorScheme = scheme) {
+                AppTheme(dark) {
                     Surface(Modifier.fillMaxSize()) {
                         var crashText by remember { mutableStateOf(crash) }
                         if (crashText != null) {
@@ -174,6 +168,9 @@ private fun titleFor(dest: Int, current: Project?): String = when (dest) {
     12 -> tr("الموصلات")
     13 -> tr("البوابة المحلية")
     14 -> tr("التوجيه والتحليلات")
+    15 -> tr("سير العمل")
+    16 -> tr("متصفح GitHub")
+    17 -> tr("النماذج")
     6 -> tr("الرفع إلى GitHub")
     7 -> tr("المحاكي والسحابة")
     else -> tr("الملفات")
@@ -291,13 +288,20 @@ fun DrawerContent(
     val pinned = filtered.filter { it.pinned }
     val recent = filtered.filter { !it.pinned }.take(15)
     val nav = listOf(
-        Triple(8, "المحادثة", "💬"), Triple(1, "التشغيل", "▶️"), Triple(0, "الوكلاء", "🤖"), Triple(2, "المشاريع", "🗂️"),
+        Triple(8, "المحادثة", "💬"), Triple(1, "التشغيل", "▶️"), Triple(15, "سير العمل", "🧭"), Triple(17, "النماذج", "✨"), Triple(0, "الوكلاء", "🤖"), Triple(2, "المشاريع", "🗂️"),
         Triple(4, "الكود", "💻"), Triple(5, "الملفات", "📄")
     )
-    val cloudNav = listOf(Triple(14, "التوجيه والتحليلات", "📊"), Triple(13, "البوابة المحلية", "🌐"), Triple(12, "الموصلات", "🔌"), Triple(6, "الرفع إلى GitHub", "☁️"), Triple(7, "المحاكي والسحابة", "📱"))
+    val cloudNav = listOf(Triple(14, "التوجيه والتحليلات", "📊"), Triple(13, "البوابة المحلية", "🌐"), Triple(12, "الموصلات", "🔌"), Triple(6, "الرفع إلى GitHub", "☁️"), Triple(16, "متصفح GitHub", "🌍"), Triple(7, "المحاكي والسحابة", "📱"))
     val accountNav = listOf(Triple(9, "الملف الشخصي", "👤"), Triple(10, "القدرات", "🧩"), Triple(11, "الوثائق", "📚"), Triple(3, "الإعدادات", "⚙️"))
     Column(Modifier.fillMaxSize().padding(12.dp)) {
-        Text("Claude Agents Team", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(8.dp))
+        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ProviderBadge("C", 36)
+            Column {
+                Text("Claude Agents Team", style = MaterialTheme.typography.titleLarge)
+                val ready = vm.agents.count { it.enabled }
+                Text(trf("%s وكيل مفعّل", ready), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         OutlinedTextField(
             query, onQuery,
             placeholder = { Text(tr("بحث")) },
@@ -382,14 +386,37 @@ fun RelayScreen(vm: RelayViewModel) {
     val actions = rememberProjectActions(vm)
     val appCtx = LocalContext.current
     val gh = remember { GhConfig(Storage(appCtx)) }
+    val backStack = remember { mutableStateListOf<Int>() }
+    var lastBack by remember { mutableStateOf(0L) }
+    fun go(d: Int) {
+        if (d == dest) return
+        backStack.add(dest)
+        if (backStack.size > 30) backStack.removeAt(0)
+        dest = d
+    }
+    // الرجوع: يغلق القائمة، ثم يعود للشاشة السابقة؛ ومن الشاشة الرئيسية يلزم ضغطتان للخروج.
+    BackHandler {
+        when {
+            drawer.isOpen -> scope.launch { drawer.close() }
+            backStack.isNotEmpty() -> dest = backStack.removeAt(backStack.lastIndex)
+            dest != 1 -> dest = 1
+            System.currentTimeMillis() - lastBack < 2000 -> (appCtx as? android.app.Activity)?.finish()
+            else -> {
+                lastBack = System.currentTimeMillis()
+                Toast.makeText(appCtx, tr("اضغط مرة أخرى للخروج"), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     val manual = vm.manualRequest
     if (manual != null) {
+        BackHandler { vm.answerManual(null) }
         ManualScreen(manual) { vm.answerManual(it) }
         return
     }
     val lu = loginUrl
     if (lu != null) {
+        BackHandler { loginUrl = null }
         LoginScreen(lu) { loginUrl = null }
         return
     }
@@ -401,9 +428,9 @@ fun RelayScreen(vm: RelayViewModel) {
             ModalDrawerSheet {
                 DrawerContent(
                     vm, dest, query, { query = it },
-                    onNavigate = { dest = it; scope.launch { drawer.close() } },
-                    onOpenProject = { id -> if (vm.openProject(id)) dest = 1; scope.launch { drawer.close() } },
-                    onNewSession = { if (!vm.running) vm.reset(); dest = 1; scope.launch { drawer.close() } }
+                    onNavigate = { go(it); scope.launch { drawer.close() } },
+                    onOpenProject = { id -> if (vm.openProject(id)) go(1); scope.launch { drawer.close() } },
+                    onNewSession = { if (!vm.running) vm.reset(); go(1); scope.launch { drawer.close() } }
                 )
             }
         }
@@ -411,6 +438,7 @@ fun RelayScreen(vm: RelayViewModel) {
         Scaffold(
             topBar = {
                 TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                     title = { Text(titleFor(dest, current), maxLines = 1) },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawer.open() } }) {
@@ -434,16 +462,19 @@ fun RelayScreen(vm: RelayViewModel) {
                 when (dest) {
                     0 -> AgentsTab(vm) { loginUrl = it }
                     1 -> RunTab(vm)
-                    2 -> ProjectsTab(vm, actions, query, false, { dest = 1 }) { renameTarget = it }
-                    4 -> ProjectsTab(vm, actions, query, true, { dest = 1 }) { renameTarget = it }
+                    2 -> ProjectsTab(vm, actions, query, false, { go(1) }) { renameTarget = it }
+                    4 -> ProjectsTab(vm, actions, query, true, { go(1) }) { renameTarget = it }
                     5 -> FilesTab(vm, query)
-                    8 -> ChatTab(vm) { dest = 1 }
+                    8 -> ChatTab(vm) { go(1) }
                     9 -> ProfileTab(vm)
                     10 -> CapabilitiesTab(vm)
                     11 -> DocsTab()
-                    12 -> ConnectorsTab(vm, gh) { dest = it }
+                    12 -> ConnectorsTab(vm, gh) { go(it) }
                     13 -> GatewayTab(vm)
                     14 -> AnalyticsTab(vm)
+                    15 -> WorkflowTab(vm) { go(1) }
+                    16 -> BrowserTab(gh)
+                    17 -> ModelsTab(vm, { go(14) }, { go(0) })
                     6 -> GitHubTab(vm, gh)
                     7 -> EmulatorTab(vm, gh)
                     else -> SettingsTab()

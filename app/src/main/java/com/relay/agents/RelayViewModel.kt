@@ -91,6 +91,12 @@ class RelayViewModel(app: Application) : AndroidViewModel(app) {
         storage.saveSetting("chat_include", chatInclude.joinToString(","))
     }
 
+    /** يختار وكيل المحادثة من منتقي النماذج؛ null = تلقائي (كل الوكلاء). */
+    fun pickChatAgent(id: String?) {
+        chatInclude = if (id == null) emptySet() else setOf(id)
+        storage.saveSetting("chat_include", chatInclude.joinToString(","))
+    }
+
     /** موصلات الإشعارات (Webhook/تيليجرام/ntfy). */
     val connectors = ConnectorConfig(storage)
 
@@ -298,6 +304,51 @@ class RelayViewModel(app: Application) : AndroidViewModel(app) {
 
     private var current: Project? = storage.currentProjectId()?.let { store.load(it) }
     private var job: Job? = null
+    private var liveOrch: Orchestrator? = null
+
+    // ---------- الأدوار: من يعمل المهمة الرئيسية ومن ينفذ الباقي ----------
+    var leadId by mutableStateOf(storage.setting("role_lead", ""))
+        private set
+    var workerIds by mutableStateOf(storage.setting("role_workers", "").split(",").filter { it.isNotEmpty() }.toSet())
+        private set
+
+    private fun applyRoles() {
+        liveOrch?.leadId = leadId
+        liveOrch?.workerIds = workerIds
+    }
+
+    /** يحدد الوكيل الرئيسي (التخطيط والتجميع النهائي)؛ المعرّف الفارغ = تلقائي. يسري فوراً حتى أثناء التشغيل. */
+    fun setLead(id: String) {
+        leadId = id
+        storage.saveSetting("role_lead", id)
+        applyRoles()
+    }
+
+    fun toggleWorker(id: String) {
+        workerIds = if (id in workerIds) workerIds - id else workerIds + id
+        storage.saveSetting("role_workers", workerIds.joinToString(","))
+        applyRoles()
+    }
+
+    fun clearWorkers() {
+        workerIds = emptySet()
+        storage.saveSetting("role_workers", "")
+        applyRoles()
+    }
+
+    /** يثبّت وكيلاً لخطوة قادمة (المعرّف الفارغ = تلقائي). */
+    fun assignStep(index: Int, agentId: String) {
+        val orch = liveOrch
+        if (running && orch != null) { orch.assign(index, agentId); return }
+        val cp = checkpoint ?: return
+        if (index !in cp.steps.indices || cp.steps[index].status == StepStatus.DONE) return
+        val steps = cp.steps.toMutableList()
+        steps[index] = steps[index].copy(assignee = agentId)
+        val upd = cp.copy(steps = steps)
+        checkpoint = upd
+        persist(upd)
+        storage.saveCheckpoint(upd)
+    }
 
     val currentProjectId: String? get() = current?.id
 
@@ -482,6 +533,9 @@ class RelayViewModel(app: Application) : AndroidViewModel(app) {
             }
             orch.profile = profileText()
             orch.strategy = routeStrategy
+            orch.leadId = leadId
+            orch.workerIds = workerIds
+            liveOrch = orch
             try {
                 orch.run(goal, agents, resume, memory, bundle, (resume ?: checkpoint)?.coding ?: false, (resume ?: checkpoint)?.thinking ?: false) { digest ->
                     projectAttachments = projectAttachments.copy(imageDigest = digest)
@@ -489,6 +543,7 @@ class RelayViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } finally {
                 running = false
+                liveOrch = null
                 refreshProjects()
             }
             // تُرسل الإشعارات فقط عند اكتمال المهمة طبيعياً (ليس عند الإيقاف أو الإلغاء).

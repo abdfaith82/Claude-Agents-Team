@@ -67,6 +67,24 @@ class Orchestrator(
     /** استراتيجية اختيار الوكيل (أولوية/متوازن/الأسرع/الأوثق). */
     var strategy = AgentRouter.Strategy.BALANCED
 
+    /** الوكيل الرئيسي: يخطط ويجمّع النتيجة النهائية. فارغ = تلقائي. يمكن تغييره أثناء التشغيل. */
+    @Volatile var leadId = ""
+
+    /** وكلاء تنفيذ الخطوات. فارغ = كل الوكلاء. يمكن تغييرها أثناء التشغيل. */
+    @Volatile var workerIds: Set<String> = emptySet()
+
+    enum class Role { LEAD, WORKER, ANY }
+
+    /** يثبّت وكيلاً لخطوة لم تُنفَّذ بعد. */
+    fun assign(index: Int, agentId: String) {
+        val steps = cp.steps.toMutableList()
+        if (index !in steps.indices || steps[index].status == StepStatus.DONE) return
+        steps[index] = steps[index].copy(assignee = agentId)
+        cp = cp.copy(steps = steps)
+        storage.saveCheckpoint(cp)
+        publish()
+    }
+
     private fun publish() = onUpdate(cp, router.snapshot())
 
     private fun log(msg: String) {
@@ -82,8 +100,11 @@ class Orchestrator(
         maxTokens: Int,
         images: List<ImageData> = emptyList(),
         eligible: (AgentConfig) -> Boolean = { true },
-        withContext: Boolean = true
+        withContext: Boolean = true,
+        role: Role = Role.ANY,
+        assignee: String = ""
     ): Pair<String, String>? {
+        var relaxed = false
         val system = buildString {
             append(baseSystem)
             if (withContext && memory.isNotBlank())
@@ -94,12 +115,32 @@ class Orchestrator(
                 append("\n\n--- Task attachments ---\n$attachCtx")
         }
         while (coroutineContext.isActive) {
-            when (val p = router.pick(eligible)) {
+            // قيد الدور (وكيل رئيسي/منفّذون/خطوة مثبّتة) يُتجاهل إن تعطّل أصحابه أو طال انتظارهم.
+            val byAssignee: (AgentConfig) -> Boolean = { it.id == assignee }
+            val byLead: (AgentConfig) -> Boolean = { it.id == leadId }
+            val workers = workerIds
+            val byWorkers: (AgentConfig) -> Boolean = { it.id in workers }
+            val want: ((AgentConfig) -> Boolean)? = when {
+                relaxed -> null
+                assignee.isNotEmpty() -> byAssignee
+                role == Role.LEAD && leadId.isNotEmpty() -> byLead
+                role == Role.WORKER && workers.isNotEmpty() -> byWorkers
+                else -> null
+            }
+            val both: (AgentConfig) -> Boolean = { a -> want != null && want(a) && eligible(a) }
+            val filter: (AgentConfig) -> Boolean =
+                if (want != null && router.hasEligible(both)) both else eligible
+            when (val p = router.pick(filter)) {
                 AgentRouter.Pick.None -> {
                     log(tr("⛔ كل الوكلاء معطّلون (تحقق من المفاتيح والنماذج)"))
                     return null
                 }
                 is AgentRouter.Pick.Wait -> {
+                    if (want != null && p.ms > 60_000) {
+                        relaxed = true
+                        log(tr("↪️ الوكيل المحدد غير متاح الآن، سيكمل وكيل آخر"))
+                        continue
+                    }
                     if (p.ms > 5_000) log(trf("⏳ كل الوكلاء في راحة، انتظار %s ثانية", p.ms / 1000))
                     publish()
                     delay(minOf(p.ms, 30_000))
@@ -202,7 +243,7 @@ class Orchestrator(
                 val plan = callWithFailover(
                     baseSystem = if (cp.coding) PLAN_CODING_SYSTEM else PLAN_SYSTEM,
                     user = "Goal: ${cp.goal}" + if (attempt == 2) "\n\nReply NOW with ONLY a JSON array of strings." else "",
-                    maxTokens = 2048
+                    maxTokens = 2048, role = Role.LEAD
                 ) ?: return
                 steps = parseSteps(plan.first)
                 by = plan.second
@@ -237,7 +278,8 @@ class Orchestrator(
             }
             val res = callWithFailover(
                 if (cp.coding) CODING_SYSTEM else EXEC_SYSTEM,
-                prompt, if (cp.coding) 4096 else 2048
+                prompt, if (cp.coding) 4096 else 2048,
+                role = Role.WORKER, assignee = step.assignee
             ) ?: return
             // التفكير العميق: نقد المسودة بوكيل آخر ثم تحسينها (الموجّه يوزّع على الأقل استخداماً فيختلف الوكيل غالباً).
             var finalRes = res
@@ -269,11 +311,11 @@ class Orchestrator(
                     FINAL_CODING_SYSTEM,
                     "Goal: ${cp.goal}\n\nProduced files (${files.size}):\n${files.keys.joinToString("\n")}\n\nSteps:\n" +
                         cp.steps.mapIndexed { n, s -> "${n + 1}. ${s.title}" }.joinToString("\n"),
-                    2048
+                    2048, role = Role.LEAD
                 )
             } else {
                 val all = cp.steps.mapIndexed { n, s -> "${n + 1}. ${s.title}\n${s.result.take(1500)}" }.joinToString("\n\n")
-                callWithFailover(FINAL_SYSTEM, "Goal: ${cp.goal}\n\nStep results:\n$all", 2048)
+                callWithFailover(FINAL_SYSTEM, "Goal: ${cp.goal}\n\nStep results:\n$all", 2048, role = Role.LEAD)
             }
             val fin = finRes ?: return
             cp = cp.copy(finalAnswer = fin.first)
