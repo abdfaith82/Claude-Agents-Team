@@ -29,11 +29,12 @@ object Scoring {
     fun intelligence(model: String): Int {
         val m = model.lowercase()
         val params = PARAMS.findAll(m).mapNotNull { it.groupValues[1].toDoubleOrNull() }.maxOrNull()
+        val tokens = m.split(Regex("[^a-z0-9]+")).toSet()
         val base = when {
             params != null && params > 0 -> 25 + 11 * log2(params)
-            listOf("haiku", "flash", "mini", "lite", "small", "nano", "instant").any { it in m } -> 65.0
-            listOf("opus", "gpt-5", "ultra", "pro").any { it in m } -> 92.0
-            listOf("sonnet", "gpt-4", "large", "gemini").any { it in m } -> 85.0
+            listOf("haiku", "flash", "mini", "lite", "small", "nano", "instant").any { it in tokens } -> 65.0
+            ("gpt-5" in m || listOf("opus", "ultra", "pro").any { it in tokens }) -> 92.0
+            ("gpt-4" in m || "gemini" in m || listOf("sonnet", "large").any { it in tokens }) -> 85.0
             else -> 60.0
         }
         return base.coerceIn(10.0, 100.0).roundToInt()
