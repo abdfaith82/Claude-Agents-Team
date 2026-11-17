@@ -42,6 +42,15 @@ fun trf(ar: String, vararg args: Any?): String = I18n.trf(ar, *args)
 /** قاموس الإنجليزية (المفتاح = النص العربي الأصلي). منفصل ليسهل اختباره بلا Compose. */
 object Translations {
     val EN: Map<String, String> = mapOf(
+        "أوامر جاهزة للطرفية" to "Ready-to-run terminal commands",
+        "كل مربع أدناه أوامر صالحة للصق مباشرة في Termux، والمفتاح مُدرج فيها. انسخ مربعاً واحداً كل مرة." to "Each box below is valid to paste straight into Termux, with the key included. Copy one box at a time.",
+        "فحص الاتصال" to "Connection check",
+        "إرسال رسالة (OpenAI)" to "Send a message (OpenAI)",
+        "إرسال رسالة (Anthropic)" to "Send a message (Anthropic)",
+        "متغيرات Claude Code / Anthropic SDK" to "Claude Code / Anthropic SDK variables",
+        "متغيرات عملاء OpenAI" to "OpenAI client variables",
+        "نسخ الأمر" to "Copy command",
+        "اسم النموذج: auto أو auto:fast أو auto:reliable أو auto:priority أو auto:vision أو اسم وكيل. الترويسة X-Routed-Via تُظهر من أجاب." to "Model name: auto, auto:fast, auto:reliable, auto:priority, auto:vision or an agent name. The X-Routed-Via header shows who answered.",
         "سير العمل" to "Workflow",
         "متصفح GitHub" to "GitHub browser",
         "النماذج" to "Models",

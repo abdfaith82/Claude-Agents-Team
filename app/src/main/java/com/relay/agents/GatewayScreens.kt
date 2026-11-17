@@ -80,13 +80,23 @@ fun GatewayTab(vm: RelayViewModel) {
             Text(tr("هذا المفتاح يخص بوابتك فقط ويُحفظ مشفّراً. تجديده يُبطل القديم."), style = MaterialTheme.typography.bodySmall)
         }
 
-        Section(tr("طريقة الاستخدام")) {
-            val snippet = "OpenAI:\n  base_url = $base/v1\n  api_key  = <key>\n  model    = auto   (auto:fast | auto:reliable | auto:priority | auto:vision | agent name)\n\n" +
-                "curl $base/v1/chat/completions \\\n  -H \"Authorization: Bearer <key>\" -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"auto\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}'\n\n" +
-                "Claude Code / Anthropic SDK:\n  ANTHROPIC_BASE_URL=$base\n  ANTHROPIC_AUTH_TOKEN=<key>"
-            SelectionContainer { Text(snippet, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
-            OutlinedButton(onClick = { clipboard.setText(AnnotatedString(snippet.replace("<key>", vm.gatewayKey))) }) { Text(tr("نسخ مع المفتاح")) }
-            Text(tr("الترويسة X-Routed-Via في كل رد تُظهر أي وكيل أجاب."), style = MaterialTheme.typography.bodySmall)
+        Section(tr("أوامر جاهزة للطرفية")) {
+            Text(tr("كل مربع أدناه أوامر صالحة للصق مباشرة في Termux، والمفتاح مُدرج فيها. انسخ مربعاً واحداً كل مرة."), style = MaterialTheme.typography.bodySmall)
+            val k = vm.gatewayKey
+            val cmds = listOf(
+                tr("فحص الاتصال") to "curl $base/health",
+                tr("إرسال رسالة (OpenAI)") to "curl $base/v1/chat/completions \\\n  -H \"Authorization: Bearer $k\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"auto\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}'",
+                tr("إرسال رسالة (Anthropic)") to "curl $base/v1/messages \\\n  -H \"x-api-key: $k\" \\\n  -H \"anthropic-version: 2023-06-01\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"model\":\"auto\",\"max_tokens\":256,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}'",
+                tr("متغيرات Claude Code / Anthropic SDK") to "export ANTHROPIC_BASE_URL=$base\nexport ANTHROPIC_AUTH_TOKEN=$k",
+                tr("متغيرات عملاء OpenAI") to "export OPENAI_BASE_URL=$base/v1\nexport OPENAI_API_KEY=$k"
+            )
+            cmds.forEach { (title, cmd) ->
+                Text(title, style = MaterialTheme.typography.labelLarge)
+                SelectionContainer { Text(cmd.replace(k, if (showKey) k else "cat-••••"), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
+                OutlinedButton(onClick = { clipboard.setText(AnnotatedString(cmd)) }) { Text(tr("نسخ الأمر")) }
+            }
+            Text(tr("اسم النموذج: auto أو auto:fast أو auto:reliable أو auto:priority أو auto:vision أو اسم وكيل. الترويسة X-Routed-Via تُظهر من أجاب."),
+                style = MaterialTheme.typography.bodySmall)
         }
 
         Section(tr("حدود مهمة")) {
