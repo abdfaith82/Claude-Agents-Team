@@ -9,7 +9,13 @@ class Ans(val text: String, val id: String, val name: String, val provider: Prov
  * مجمّع الوكلاء المشترك بين المحادثة والبوابة المحلية: موجّه واحد يعرف حالة كل وكيل (راحة/تعطيل/زمن/موثوقية)،
  * فلا يُرهَق وكيل في مكان وهو متعثر في آخر.
  */
+/** محاولة واحدة ضمن مسار طلب. */
+class Attempt(val name: String, val ok: Boolean, val detail: String)
+
 class AgentPool {
+    /** مسار آخر طلب: من جُرّب وماذا حدث. */
+    @Volatile var lastTrace: List<Attempt> = emptyList()
+
     val router = AgentRouter()
     private var sig = ""
 
@@ -34,7 +40,9 @@ class AgentPool {
     ): Ans? {
         var waited = 0L
         var tries = 0
-        while (tries < 8) {
+        val trace = mutableListOf<Attempt>()
+        lastTrace = emptyList()
+        while (tries < 20) {
             if (!failover && tries >= 1) return null
             when (val p = router.pick(eligible, strat ?: router.strategy)) {
                 AgentRouter.Pick.None -> {
@@ -53,9 +61,11 @@ class AgentPool {
                     router.markStart(a.id)
                     status(trf("⏳ %s يجيب…", a.name))
                     when (val r = ClaudeClient.send(a, system, user, tokens, images)) {
-                        is ApiResult.Ok -> { router.onSuccess(a.id, r.ms); return Ans(r.text.trim(), a.id, a.name, a.provider, r.ms) }
+                        is ApiResult.Ok -> { router.onSuccess(a.id, r.ms); trace += Attempt(a.name, true, "200 · ${r.ms} ms"); lastTrace = trace.toList(); return Ans(r.text.trim(), a.id, a.name, a.provider, r.ms) }
                         is ApiResult.Fail -> {
-                            router.onFailure(a.id, r.code, r.retryAfterMs, r.fatal, r.message)
+                            val cd = router.onFailure(a.id, r.code, r.retryAfterMs, r.fatal, r.message)
+                            trace += Attempt(a.name, false, if (cd < 0) "${r.code} → disabled" else "${r.code} → skipped, cooled ${cd / 1000} s")
+                            lastTrace = trace.toList()
                             lastError = "${a.name}: ${r.code} ${r.message.take(120)}"
                             status(trf("⚠️ %s توقف، ينتقل للتالي", a.name))
                         }

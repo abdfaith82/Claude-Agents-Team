@@ -116,6 +116,7 @@ fun AnalyticsTab(vm: RelayViewModel) {
     val live = remember(tick, vm.health) { vm.pool.router.stats() }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        RouteTraceCard(vm, tick)
         Section(tr("استراتيجية التوجيه")) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 AgentRouter.Strategy.values().forEach { st ->
@@ -128,6 +129,7 @@ fun AnalyticsTab(vm: RelayViewModel) {
                     AgentRouter.Strategy.PRIORITY -> tr("يستخدم أول وكيل جاهز حسب الترتيب أدناه، والباقي احتياط.")
                     AgentRouter.Strategy.FASTEST -> tr("يفضّل الوكيل ذا أقل زمن استجابة مقاس.")
                     AgentRouter.Strategy.RELIABLE -> tr("يفضّل الوكيل ذا أعلى نسبة نجاح.")
+                    AgentRouter.Strategy.SMARTEST -> tr("يفضّل النموذج الأقوى (تقدير تقريبي من حجمه وعائلته).")
                 },
                 style = MaterialTheme.typography.bodySmall
             )
@@ -177,9 +179,10 @@ fun AnalyticsTab(vm: RelayViewModel) {
 }
 
 @Composable
-private fun strategyLabel(s: AgentRouter.Strategy): String = when (s) {
+internal fun strategyLabel(s: AgentRouter.Strategy): String = when (s) {
     AgentRouter.Strategy.BALANCED -> tr("متوازن")
     AgentRouter.Strategy.PRIORITY -> tr("أولوية")
     AgentRouter.Strategy.FASTEST -> tr("الأسرع")
     AgentRouter.Strategy.RELIABLE -> tr("الأوثق")
+    AgentRouter.Strategy.SMARTEST -> tr("الأذكى")
 }

@@ -203,6 +203,7 @@ object GatewayLogic {
             "auto:fast" -> base to AgentRouter.Strategy.FASTEST
             "auto:reliable" -> base to AgentRouter.Strategy.RELIABLE
             "auto:priority" -> base to AgentRouter.Strategy.PRIORITY
+            "auto:smart" -> base to AgentRouter.Strategy.SMARTEST
             "auto:vision" -> ({ a: AgentConfig -> base(a) && a.provider.vision }) to null
             else -> {
                 val ids = agents.filter { it.name.lowercase() == m || it.model.lowercase() == m }.map { it.id }.toSet()

@@ -39,7 +39,7 @@ class AgentRouter(
     }
 
     /** طريقة ترتيب الوكلاء الجاهزين: BALANCED أقل استخداماً، PRIORITY حسب ترتيب القائمة، FASTEST الأسرع، RELIABLE الأعلى نجاحاً. */
-    enum class Strategy { BALANCED, PRIORITY, FASTEST, RELIABLE }
+    enum class Strategy { BALANCED, PRIORITY, FASTEST, RELIABLE, SMARTEST }
 
     var strategy = Strategy.BALANCED
 
@@ -85,6 +85,9 @@ class AgentRouter(
             Strategy.PRIORITY -> readyList.firstOrNull()
             // وكيل بلا قياس بعد يُعطى زمناً متفائلاً كي يُجرَّب مرة.
             Strategy.FASTEST -> readyList.minWithOrNull(compareBy<Health>({ if (it.latencyMs > 0) it.latencyMs else 1_000.0 }, { it.lastStart }))
+            Strategy.SMARTEST -> readyList.maxWithOrNull(compareBy<Health>({
+                Scoring.score(Scoring.weights(Strategy.SMARTEST), reliability(it), Scoring.speed(it.latencyMs), Scoring.intelligence(it.agent.model))
+            }, { -it.lastStart.toDouble() }))
             Strategy.RELIABLE -> readyList.maxWithOrNull(compareBy<Health>({ reliability(it) }, { -it.lastStart.toDouble() }))
         }
         if (ready != null) return Pick.Ready(ready)
