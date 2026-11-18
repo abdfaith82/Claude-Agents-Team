@@ -332,7 +332,7 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
                 FilterChip(
                     selected = t.id == tab?.id,
                     onClick = { BrowserHub.select(t) },
-                    label = { Text("🔒${t.env} · " + t.title.ifBlank { Uri.parse(t.url).host ?: tr("تبويب") }.take(16), maxLines = 1) },
+                    label = { Text(t.env + " · " + t.title.ifBlank { Uri.parse(t.url).host ?: tr("تبويب") }.take(12), maxLines = 1) },
                     trailingIcon = { Text("✕", Modifier.clickable { BrowserHub.close(t) }.padding(2.dp)) }
                 )
             }
@@ -347,19 +347,14 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
             }
         }
         if (tab != null) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(enabled = tab.canBack, onClick = { tab.session.goBack() }) { Text(if (I18n.isRtl) "→" else "←") }
-                TextButton(enabled = tab.canFwd, onClick = { tab.session.goForward() }) { Text(if (I18n.isRtl) "←" else "→") }
-                TextButton(onClick = { if (tab.loading) tab.session.stop() else tab.session.reload() }) { Text(if (tab.loading) "✕" else "⟳") }
-                OutlinedTextField(
-                    addr, { addr = it }, singleLine = true, modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.large, textStyle = MaterialTheme.typography.bodySmall,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { go(addr) })
-                )
-                TextButton(onClick = { agentOpen = true }) { Text("🤖") }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(enabled = tab.canBack, onClick = { tab.session.goBack() }) { Text(if (I18n.isRtl) "→" else "←", style = MaterialTheme.typography.titleMedium) }
+                IconButton(enabled = tab.canFwd, onClick = { tab.session.goForward() }) { Text(if (I18n.isRtl) "←" else "→", style = MaterialTheme.typography.titleMedium) }
+                IconButton(onClick = { if (tab.loading) tab.session.stop() else tab.session.reload() }) { Text(if (tab.loading) "✕" else "⟳", style = MaterialTheme.typography.titleMedium) }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { agentOpen = true }) { Text("🤖") }
                 Box {
-                    TextButton(onClick = { moreMenu = true }) { Text("⋮") }
+                    IconButton(onClick = { moreMenu = true }) { Text("⋮", style = MaterialTheme.typography.titleMedium) }
                     DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                         DropdownMenuItem(text = { Text(tr("فتح في المتصفح الخارجي")) }, onClick = {
                             moreMenu = false
@@ -371,6 +366,13 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
                     }
                 }
             }
+            OutlinedTextField(
+                addr, { addr = it }, singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                shape = MaterialTheme.shapes.large, textStyle = MaterialTheme.typography.bodyMedium,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { go(addr) })
+            )
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
                     tr("الكود") to base, "Actions" to "$base/actions", tr("الإصدارات") to "$base/releases",
@@ -378,7 +380,7 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
                     "Google" to "https://accounts.google.com"
                 ).forEach { (label, url) -> AssistChip(onClick = { tab.session.loadUri(url) }, label = { Text(label) }) }
             }
-            if (tab.loading && tab.progress in 1..99) LinearProgressIndicator(progress = { tab.progress / 100f }, modifier = Modifier.fillMaxWidth())
+            if (tab.loading && tab.progress in 1..99) LinearProgressIndicator(progress = { tab.progress / 100f }, modifier = Modifier.fillMaxWidth().height(2.dp))
 
             // لا نربط العرض إلا بعد فتح الجلسة (تبويبات النوافذ المنبثقة يفتحها Gecko بنفسه).
             var ready by remember(tab.id) { mutableStateOf(tab.session.isOpen) }

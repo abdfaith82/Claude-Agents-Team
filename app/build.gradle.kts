@@ -73,7 +73,7 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
 
     // محرك فايرفوكس لتبويبات المتصفح المعزولة
-    implementation("org.mozilla.geckoview:geckoview:130.0.20240829075237")
+    implementation("org.mozilla.geckoview:geckoview:145.0.20251124145406")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
