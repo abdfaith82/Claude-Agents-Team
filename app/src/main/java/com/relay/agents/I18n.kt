@@ -42,6 +42,22 @@ fun trf(ar: String, vararg args: Any?): String = I18n.trf(ar, *args)
 /** قاموس الإنجليزية (المفتاح = النص العربي الأصلي). منفصل ليسهل اختباره بلا Compose. */
 object Translations {
     val EN: Map<String, String> = mapOf(
+        "تعذّر الحصول على إجابة: " to "Could not get an answer: ",
+        "اكتمل التنزيل: %s" to "Download finished: %s",
+        "تبويب" to "Tab",
+        "تبويب جديد (بيئة منفصلة)" to "New tab (separate environment)",
+        "تبويب بنفس بيئة %s" to "Tab in the same environment %s",
+        "فتح في المتصفح الخارجي" to "Open in external browser",
+        "مسح بيانات البيئة %s" to "Clear environment %s data",
+        "تعذّر قراءة الصفحة. انتظر اكتمال التحميل ثم أعد المحاولة (الجسر لا يعمل على صفحات about: وبعض الصفحات المحمية)." to "Couldn't read the page. Wait for it to finish loading and retry (the bridge doesn't run on about: pages or some protected pages).",
+        "اسأل الوكيل عن هذه الصفحة" to "Ask the agent about this page",
+        "عند الضغط يُرسَل نص الصفحة وأسماء حقولها وقيمها (بلا كلمات مرور ولا بيانات بطاقات) إلى الوكيل الرئيسي المحدد في «سير العمل». يقرأ فقط ولا ينفّذ شيئاً في الصفحة." to "On tap, the page text and its fields with values (no passwords or card data) are sent to the lead agent chosen in Workflow. It only reads and never acts on the page.",
+        "لخّص هذه الصفحة بإيجاز." to "Summarize this page briefly.",
+        "لخّص" to "Summarize",
+        "ما حقول الإدخال في هذه الصفحة وما المطلوب تعبئته؟" to "What input fields does this page have and what needs to be filled in?",
+        "اقرأ الحقول" to "Read fields",
+        "سؤالك عن الصفحة" to "Your question about the page",
+        "اسأل" to "Ask",
         "طلب واحد، وأفضل نموذج مجاني يجيب" to "One request in, the best free model out",
         "كل طلب يمرّ على سلسلة احتياط حيّة: الحدود والراحة والحصص تُعالَج قبل أن يرى تطبيقك أي خطأ." to "Every call walks a live fallback chain: rate limits, cooldowns and quotas are handled before your app sees an error.",
         "لا يوجد طلب بعد. أرسل رسالة في المحادثة أو عبر البوابة لترى المسار هنا." to "No request yet. Send a chat message or call the gateway to see the route here.",

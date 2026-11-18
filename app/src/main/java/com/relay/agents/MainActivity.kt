@@ -473,7 +473,7 @@ fun RelayScreen(vm: RelayViewModel) {
                     13 -> GatewayTab(vm)
                     14 -> AnalyticsTab(vm)
                     15 -> WorkflowTab(vm) { go(1) }
-                    16 -> BrowserTab(gh)
+                    16 -> GeckoBrowserTab(vm, gh)
                     17 -> ModelsTab(vm, { go(14) }, { go(0) })
                     6 -> GitHubTab(vm, gh)
                     7 -> EmulatorTab(vm, gh)

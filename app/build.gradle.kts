@@ -13,6 +13,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        // GeckoView ثقيل: نكتفي بمعمارية arm64 (هواتف اليوم) لتصغير الحجم.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     // مفتاح توقيع ثابت للنسخ التجريبية: كل بناء على GitHub Actions يوقَّع بنفس المفتاح،
@@ -69,6 +71,9 @@ dependencies {
     implementation("androidx.credentials:credentials:1.2.2")
     implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
+
+    // محرك فايرفوكس لتبويبات المتصفح المعزولة
+    implementation("org.mozilla.geckoview:geckoview:130.0.20240829075237")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
