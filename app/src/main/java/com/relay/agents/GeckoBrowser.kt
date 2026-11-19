@@ -56,6 +56,8 @@ private const val MODERN_UA = "Mozilla/5.0 (Android 14; Mobile; rv:145.0) Gecko/
 const val AI_STUDIO_CTX = "env_aistudio"
 // التطبيق الذي حدّدته في AI Studio (بدون /u/N ليستخدم حسابك الافتراضي بعد تسجيل الدخول).
 const val AI_STUDIO_URL = "https://aistudio.google.com/apps/97f6253e-b0fa-450d-8a98-0084dc261076?showPreview=true"
+const val APKONLINE_CTX = "env_apkonline"
+const val APKONLINE_URL = "https://www.apkonline.net/"
 private const val BRIDGE_ID = "bridge@claudeagents.team"
 
 /** تبويب واحد: جلسة Gecko خاصة به، وبيئة تخزين (ctxId) منفصلة للكوكيز وتسجيل الدخول. */
@@ -195,6 +197,14 @@ object BrowserHub {
         if (savedOf(AI_STUDIO_CTX) == null) envs.add(SavedEnv(AI_STUDIO_CTX, "AI Studio", AI_STUDIO_URL, false))
         val open = tabs.firstOrNull { it.ctxId == AI_STUDIO_CTX }
         if (open != null) select(open) else newTab(ctx, savedOf(AI_STUDIO_CTX)?.url ?: AI_STUDIO_URL, AI_STUDIO_CTX)
+        persist()
+    }
+
+    /** تبويب ApkOnline (محاكي أندرويد مستضاف) ببيئة مخصّصة. الخدمة طرف ثالث فلا نعدّل فيها شيئاً؛ نفتحها فقط. */
+    fun openApkOnline(ctx: Context) {
+        if (savedOf(APKONLINE_CTX) == null) envs.add(SavedEnv(APKONLINE_CTX, "ApkOnline", APKONLINE_URL, false))
+        val open = tabs.firstOrNull { it.ctxId == APKONLINE_CTX }
+        if (open != null) select(open) else newTab(ctx, savedOf(APKONLINE_CTX)?.url ?: APKONLINE_URL, APKONLINE_CTX)
         persist()
     }
 
@@ -586,10 +596,10 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit = {
                 listOf(
                     tr("الكود") to rb, "Actions" to "$rb/actions", tr("الإصدارات") to "$rb/releases",
                     "Issues" to "$rb/issues", "Pull requests" to "$rb/pulls", tr("الإعدادات") to "$rb/settings",
-                    "Google" to "https://accounts.google.com", "AI Studio" to "@aistudio"
+                    "Google" to "https://accounts.google.com", "AI Studio" to "@aistudio", "ApkOnline" to "@apkonline"
                 ).forEach { (label, url) ->
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { if (url == "@aistudio") BrowserHub.openAiStudio(ctx) else tab.session.loadUri(url) }) {
+                        modifier = Modifier.clickable { when (url) { "@aistudio" -> BrowserHub.openAiStudio(ctx); "@apkonline" -> BrowserHub.openApkOnline(ctx); else -> tab.session.loadUri(url) } }) {
                         Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                     }
                 }
@@ -724,5 +734,13 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit = {
 fun AiStudioTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit) {
     val ctx = LocalContext.current
     remember { BrowserHub.init(ctx, "https://github.com/${gh.owner}/${gh.repo}"); BrowserHub.openAiStudio(ctx); true }
+    GeckoBrowserTab(vm, gh, onOpenChat)
+}
+
+/** شاشة ApkOnline: محاكي أندرويد مستضاف في بيئة متصفح مستقلة؛ ارفع ملف APK من هاتفك عبر زر الرفع فيه. */
+@Composable
+fun ApkOnlineTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit) {
+    val ctx = LocalContext.current
+    remember { BrowserHub.init(ctx, "https://github.com/${gh.owner}/${gh.repo}"); BrowserHub.openApkOnline(ctx); true }
     GeckoBrowserTab(vm, gh, onOpenChat)
 }

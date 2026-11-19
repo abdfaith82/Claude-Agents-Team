@@ -173,6 +173,7 @@ private fun titleFor(dest: Int, current: Project?): String = when (dest) {
     17 -> tr("النماذج")
     18 -> tr("VPN")
     19 -> "AI Studio"
+    20 -> "ApkOnline"
     6 -> tr("الرفع إلى GitHub")
     7 -> tr("المحاكي والسحابة")
     else -> tr("الملفات")
@@ -293,7 +294,7 @@ fun DrawerContent(
         Triple(8, "المحادثة", "💬"), Triple(1, "التشغيل", "▶️"), Triple(15, "سير العمل", "🧭"), Triple(17, "النماذج", "✨"), Triple(0, "الوكلاء", "🤖"), Triple(2, "المشاريع", "🗂️"),
         Triple(4, "الكود", "💻"), Triple(5, "الملفات", "📄")
     )
-    val cloudNav = listOf(Triple(14, "التوجيه والتحليلات", "📊"), Triple(13, "البوابة المحلية", "🌐"), Triple(12, "الموصلات", "🔌"), Triple(6, "الرفع إلى GitHub", "☁️"), Triple(16, "متصفح GitHub", "🌍"), Triple(18, "VPN", "🛡️"), Triple(19, "AI Studio", "🧪"), Triple(7, "المحاكي والسحابة", "📱"))
+    val cloudNav = listOf(Triple(14, "التوجيه والتحليلات", "📊"), Triple(13, "البوابة المحلية", "🌐"), Triple(12, "الموصلات", "🔌"), Triple(6, "الرفع إلى GitHub", "☁️"), Triple(16, "متصفح GitHub", "🌍"), Triple(18, "VPN", "🛡️"), Triple(19, "AI Studio", "🧪"), Triple(20, "ApkOnline", "📲"), Triple(7, "المحاكي والسحابة", "📱"))
     val accountNav = listOf(Triple(9, "الملف الشخصي", "👤"), Triple(10, "القدرات", "🧩"), Triple(11, "الوثائق", "📚"), Triple(3, "الإعدادات", "⚙️"))
     Column(Modifier.fillMaxSize().padding(12.dp)) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -480,6 +481,7 @@ fun RelayScreen(vm: RelayViewModel) {
                     17 -> ModelsTab(vm, { go(14) }, { go(0) })
                     18 -> VpnTab(vm)
                     19 -> AiStudioTab(vm, gh) { go(8) }
+                    20 -> ApkOnlineTab(vm, gh) { go(8) }
                     6 -> GitHubTab(vm, gh)
                     7 -> EmulatorTab(vm, gh)
                     else -> SettingsTab()
