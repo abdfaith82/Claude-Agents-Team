@@ -44,5 +44,16 @@ jobs:
           path: Claude-Agents-Team.apk
           if-no-files-found: error
 
+      - name: Build x86 test APK (for x86 emulators such as ApkOnline)
+        run: |
+          gradle assembleDebug --no-daemon -Pabis=x86,x86_64
+          cp app/build/outputs/apk/debug/app-debug.apk Claude-Agents-Team-x86.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Claude-Agents-Team-x86
+          path: Claude-Agents-Team-x86.apk
+          if-no-files-found: error
+
       - name: Unit tests (router)
         run: gradle testDebugUnitTest --no-daemon

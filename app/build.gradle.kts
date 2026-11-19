@@ -17,7 +17,9 @@ android {
         versionCode = 1
         versionName = "1.0"
         // GeckoView ثقيل: نكتفي بمعمارية arm64 (هواتف اليوم) لتصغير الحجم.
-        ndk { abiFilters += "arm64-v8a" }
+        // الافتراضي arm64؛ نسخة الاختبار على محاكيات x86 تُبنى بـ -Pabis=x86,x86_64
+        val abis = (project.findProperty("abis") as String?)?.split(",")?.map { it.trim() } ?: listOf("arm64-v8a")
+        ndk { abiFilters.addAll(abis) }
     }
 
     // مفتاح توقيع ثابت للنسخ التجريبية: كل بناء على GitHub Actions يوقَّع بنفس المفتاح،
