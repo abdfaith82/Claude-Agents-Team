@@ -91,6 +91,14 @@ class BrowserTab(val id: String, val ctxId: String, startUrl: String, env0: Stri
                 return GeckoResult.fromValue(child.session)
             }
         }
+        // نافذة اختيار الملفات (زر «رفع ملفات» في المواقع): تُمرَّر إلى واجهة الاختيار في التطبيق.
+        s.promptDelegate = object : GeckoSession.PromptDelegate {
+            override fun onFilePrompt(session: GeckoSession, prompt: GeckoSession.PromptDelegate.FilePrompt): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
+                val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+                BrowserHub.filePick = FilePickReq(prompt, result)
+                return result
+            }
+        }
         s.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onPageStart(session: GeckoSession, url: String) { loading = true }
             override fun onPageStop(session: GeckoSession, success: Boolean) { loading = false; progress = 0 }
@@ -119,6 +127,9 @@ class BrowserTab(val id: String, val ctxId: String, startUrl: String, env0: Stri
     }
 }
 
+/** طلب اختيار ملف من صفحة ويب بانتظار نتيجة منتقي الملفات. */
+class FilePickReq(val prompt: GeckoSession.PromptDelegate.FilePrompt, val result: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>)
+
 /** بيئة محفوظة: اسم + آخر صفحة + تثبيت. بياناتها (الكوكيز وتسجيل الدخول) تبقى في Gecko ما لم تُمسح. */
 class SavedEnv(val ctxId: String, var name: String, var url: String, var pinned: Boolean)
 
@@ -136,6 +147,7 @@ object BrowserHub {
     private var storage: Storage? = null
     private var counter = 0
 
+    var filePick by mutableStateOf<FilePickReq?>(null)
     val envs = mutableStateListOf<SavedEnv>()
     val actions = mutableStateListOf<AgentAction>()
 
@@ -435,6 +447,38 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit = {
     var agentOpen by remember { mutableStateOf(false) }
     var saveOpen by remember { mutableStateOf(false) }
     var listOpen by remember { mutableStateOf(false) }
+
+    // رفع الملفات: منتقي النظام ثم تسليم النتيجة للصفحة.
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { res ->
+        val req = BrowserHub.filePick
+        BrowserHub.filePick = null
+        if (req != null) {
+            val data = res.data
+            val uris = mutableListOf<Uri>()
+            data?.clipData?.let { c -> for (i in 0 until c.itemCount) uris.add(c.getItemAt(i).uri) }
+            if (uris.isEmpty()) data?.data?.let { uris.add(it) }
+            val resp = if (res.resultCode != android.app.Activity.RESULT_OK || uris.isEmpty()) req.prompt.dismiss()
+            else if (uris.size == 1) req.prompt.confirm(ctx, uris[0]) else req.prompt.confirm(ctx, uris.toTypedArray())
+            req.result.complete(resp)
+        }
+    }
+    val pickReq = BrowserHub.filePick
+    LaunchedEffect(pickReq) {
+        if (pickReq != null) {
+            val multiple = pickReq.prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE
+            val mimes = pickReq.prompt.mimeTypes?.filter { it.isNotBlank() }?.toTypedArray() ?: emptyArray()
+            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = if (mimes.size == 1) mimes[0] else "*/*"
+                if (mimes.size > 1) putExtra(Intent.EXTRA_MIME_TYPES, mimes)
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple)
+            }
+            val ok = runCatching { picker.launch(Intent.createChooser(intent, null)) }.isSuccess
+            if (!ok) { BrowserHub.filePick = null; pickReq.result.complete(pickReq.prompt.dismiss()) }
+        }
+    }
 
     BackHandler(enabled = tab?.canBack == true) { tab?.session?.goBack() }
 
