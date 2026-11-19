@@ -423,6 +423,7 @@ fun RelayScreen(vm: RelayViewModel) {
 
     val current = vm.projects.firstOrNull { it.id == vm.currentProjectId }
     ModalNavigationDrawer(
+        gesturesEnabled = false, // السحب يغطي على المتصفح؛ القائمة تُفتح بزر ☰ فقط
         drawerState = drawer,
         drawerContent = {
             ModalDrawerSheet {

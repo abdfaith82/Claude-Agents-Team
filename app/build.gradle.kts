@@ -1,11 +1,14 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.relay.agents"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.claudeagents.team"
@@ -39,14 +42,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
         resources {
@@ -55,17 +52,21 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+}
+
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation(platform("androidx.compose:compose-bom:2025.08.00"))
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.2")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     // Credential Manager (تسجيل الدخول بحساب Google داخل التطبيق)
     implementation("androidx.credentials:credentials:1.2.2")
@@ -73,8 +74,8 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
 
     // محرك فايرفوكس لتبويبات المتصفح المعزولة
-    // GeckoView 145 يسحب kotlin-stdlib 2.2.20 وإصدارات androidx أحدث لا تبنى هنا؛ نبقي 130 (مجرّب) ونعرّف المتصفح بـ UA حديث.
-    implementation("org.mozilla.geckoview:geckoview:130.0.20240829075237")
+    // محرك فايرفوكس لتبويبات المتصفح المعزولة
+    implementation("org.mozilla.geckoview:geckoview:145.0.20251124145406")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
