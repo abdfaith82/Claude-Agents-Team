@@ -16,6 +16,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,6 +51,8 @@ import kotlin.concurrent.thread
 
 private const val TAG = "GeckoBrowser"
 private const val BRIDGE_URI = "resource://android/assets/bridge/"
+// بعض المواقع (مثل claude.ai) تعدّ إصدار المحرك المضمّن قديماً؛ نعرّف المتصفح بإصدار فايرفوكس حديث.
+private const val MODERN_UA = "Mozilla/5.0 (Android 14; Mobile; rv:145.0) Gecko/145.0 Firefox/145.0"
 private const val BRIDGE_ID = "bridge@claudeagents.team"
 
 /** تبويب واحد: جلسة Gecko خاصة به، وبيئة تخزين (ctxId) منفصلة للكوكيز وتسجيل الدخول. */
@@ -63,7 +68,7 @@ class BrowserTab(val id: String, val ctxId: String, startUrl: String, val env: S
     private val pending = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
 
     val session: GeckoSession = GeckoSession(
-        GeckoSessionSettings.Builder().contextId(ctxId).build()
+        GeckoSessionSettings.Builder().contextId(ctxId).userAgentOverride(MODERN_UA).build()
     ).also { s ->
         s.contentDelegate = object : GeckoSession.ContentDelegate {
             override fun onTitleChange(session: GeckoSession, title: String?) { this@BrowserTab.title = title ?: "" }
@@ -296,6 +301,14 @@ internal fun snapshotToPrompt(s: JSONObject): String {
     return sb.toString()
 }
 
+@Composable
+private fun NavBtn(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(38.dp).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(label, style = MaterialTheme.typography.titleMedium,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline)
+    }
+}
+
 /** متصفح Gecko متعدد التبويبات: كل تبويب ببيئة تسجيل دخول منفصلة، ومربوط بالوكيل الرئيسي لقراءة الصفحة وحقولها. */
 @Composable
 fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
@@ -325,19 +338,34 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        // شريط التبويبات
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp),
+        // شريط التبويبات (مضغوط)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             BrowserHub.tabs.toList().forEach { t ->
-                FilterChip(
-                    selected = t.id == tab?.id,
-                    onClick = { BrowserHub.select(t) },
-                    label = { Text(t.env + " · " + t.title.ifBlank { Uri.parse(t.url).host ?: tr("تبويب") }.take(12), maxLines = 1) },
-                    trailingIcon = { Text("✕", Modifier.clickable { BrowserHub.close(t) }.padding(2.dp)) }
-                )
+                val sel = t.id == tab?.id
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (sel) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.height(34.dp).widthIn(max = 150.dp).clickable { BrowserHub.select(t) }
+                ) {
+                    Row(Modifier.padding(start = 10.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(t.env, style = MaterialTheme.typography.labelSmall, color = Brand.GreenDark)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            t.title.ifBlank { Uri.parse(t.url).host ?: tr("تبويب") },
+                            style = MaterialTheme.typography.labelMedium, maxLines = 1, modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Box(Modifier.size(30.dp).clickable { BrowserHub.close(t) }, contentAlignment = Alignment.Center) {
+                            Text("✕", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
             }
             Box {
-                AssistChip(onClick = { plusMenu = true }, label = { Text("＋") })
+                Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(34.dp).clickable { plusMenu = true }) {
+                    Box(contentAlignment = Alignment.Center) { Text("＋") }
+                }
                 DropdownMenu(expanded = plusMenu, onDismissRequest = { plusMenu = false }) {
                     DropdownMenuItem(text = { Text(tr("تبويب جديد (بيئة منفصلة)")) },
                         onClick = { plusMenu = false; BrowserHub.newTab(ctx, "https://github.com", null) })
@@ -347,14 +375,27 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
             }
         }
         if (tab != null) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(enabled = tab.canBack, onClick = { tab.session.goBack() }) { Text(if (I18n.isRtl) "→" else "←", style = MaterialTheme.typography.titleMedium) }
-                IconButton(enabled = tab.canFwd, onClick = { tab.session.goForward() }) { Text(if (I18n.isRtl) "←" else "→", style = MaterialTheme.typography.titleMedium) }
-                IconButton(onClick = { if (tab.loading) tab.session.stop() else tab.session.reload() }) { Text(if (tab.loading) "✕" else "⟳", style = MaterialTheme.typography.titleMedium) }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { agentOpen = true }) { Text("🤖") }
+            // شريط العنوان: خانة عريضة واحدة وأزرار صغيرة
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                NavBtn(if (I18n.isRtl) "→" else "←", tab.canBack) { tab.session.goBack() }
+                NavBtn(if (I18n.isRtl) "←" else "→", tab.canFwd) { tab.session.goForward() }
+                NavBtn(if (tab.loading) "✕" else "⟳", true) { if (tab.loading) tab.session.stop() else tab.session.reload() }
+                Surface(
+                    shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.weight(1f).height(40.dp).padding(horizontal = 4.dp)
+                ) {
+                    BasicTextField(
+                        value = addr, onValueChange = { addr = it }, singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = { go(addr) }),
+                        modifier = Modifier.padding(horizontal = 14.dp).wrapContentHeight(Alignment.CenterVertically)
+                    )
+                }
+                NavBtn("🤖", true) { agentOpen = true }
                 Box {
-                    IconButton(onClick = { moreMenu = true }) { Text("⋮", style = MaterialTheme.typography.titleMedium) }
+                    NavBtn("⋮", true) { moreMenu = true }
                     DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                         DropdownMenuItem(text = { Text(tr("فتح في المتصفح الخارجي")) }, onClick = {
                             moreMenu = false
@@ -366,19 +407,17 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig) {
                     }
                 }
             }
-            OutlinedTextField(
-                addr, { addr = it }, singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                shape = MaterialTheme.shapes.large, textStyle = MaterialTheme.typography.bodyMedium,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { go(addr) })
-            )
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
                     tr("الكود") to base, "Actions" to "$base/actions", tr("الإصدارات") to "$base/releases",
                     "Issues" to "$base/issues", "Pull requests" to "$base/pulls", tr("الإعدادات") to "$base/settings",
                     "Google" to "https://accounts.google.com"
-                ).forEach { (label, url) -> AssistChip(onClick = { tab.session.loadUri(url) }, label = { Text(label) }) }
+                ).forEach { (label, url) ->
+                    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.clickable { tab.session.loadUri(url) }) {
+                        Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                    }
+                }
             }
             if (tab.loading && tab.progress in 1..99) LinearProgressIndicator(progress = { tab.progress / 100f }, modifier = Modifier.fillMaxWidth().height(2.dp))
 
