@@ -73,15 +73,8 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
 
     // محرك فايرفوكس لتبويبات المتصفح المعزولة
-    // GeckoView 145 يسحب نسخاً أحدث من androidx تتطلب AGP 8.9+؛ نستبعدها ونبقي نسخ المشروع المثبّتة.
-    implementation("org.mozilla.geckoview:geckoview:145.0.20251124145406") {
-        exclude(group = "androidx.compose.ui")
-        exclude(group = "androidx.compose.runtime")
-        exclude(group = "androidx.compose.foundation")
-        exclude(group = "androidx.compose.material3")
-        exclude(group = "androidx.lifecycle")
-        exclude(group = "androidx.core")
-    }
+    // GeckoView 145 يسحب kotlin-stdlib 2.2.20 وإصدارات androidx أحدث لا تبنى هنا؛ نبقي 130 (مجرّب) ونعرّف المتصفح بـ UA حديث.
+    implementation("org.mozilla.geckoview:geckoview:130.0.20240829075237")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
