@@ -42,6 +42,22 @@ fun trf(ar: String, vararg args: Any?): String = I18n.trf(ar, *args)
 /** قاموس الإنجليزية (المفتاح = النص العربي الأصلي). منفصل ليسهل اختباره بلا Compose. */
 object Translations {
     val EN: Map<String, String> = mapOf(
+        "إلغاء تثبيت البيئة %s" to "Unpin environment %s",
+        "📌 تثبيت البيئة %s" to "📌 Pin environment %s",
+        "حفظ البيئة باسم…" to "Save environment as…",
+        "البيئات المحفوظة (%s)" to "Saved environments (%s)",
+        "هذه الصفحة" to "This page",
+        "كل التبويبات (%s)" to "All tabs (%s)",
+        "نشاط الوكيل في المتصفح: %s" to "Agent activity in the browser: %s",
+        "هذا ما نفّذه الوكيل في المتصفح وحالة التبويبات. اقرأه وكمّل منه:" to "This is what the agent did in the browser and the tabs state. Read it and continue from it:",
+        "تصدير إلى الوكيل الرئيسي" to "Export to the lead agent",
+        "حفظ البيئة" to "Save environment",
+        "تُحفظ البيئة باسم لاستعادتها في أي جلسة جديدة مع تسجيل الدخول وبياناتها، حتى لو أغلقت تبويباتها." to "The environment is saved under a name so you can restore it in any new session with its logins and data, even after closing its tabs.",
+        "اسم البيئة" to "Environment name",
+        "البيئات المحفوظة" to "Saved environments",
+        "لا توجد بيئات محفوظة. احفظ بيئة أو ثبّتها من القائمة ⋮." to "No saved environments. Save or pin one from the ⋮ menu.",
+        "حذف البيئة %s؟" to "Delete environment %s?",
+        "يمسح بياناتها نهائياً (الكوكيز وتسجيل الدخول) ويغلق تبويباتها." to "Permanently wipes its data (cookies and logins) and closes its tabs.",
         "تعذّر الحصول على إجابة: " to "Could not get an answer: ",
         "اكتمل التنزيل: %s" to "Download finished: %s",
         "تبويب" to "Tab",
