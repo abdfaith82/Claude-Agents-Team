@@ -73,6 +73,9 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
 
+    // نواة VPN (WireGuard الرسمية)
+    implementation("com.wireguard.android:tunnel:1.0.20230706")
+
     // محرك فايرفوكس لتبويبات المتصفح المعزولة
     // محرك فايرفوكس لتبويبات المتصفح المعزولة
     implementation("org.mozilla.geckoview:geckoview:145.0.20251124145406")

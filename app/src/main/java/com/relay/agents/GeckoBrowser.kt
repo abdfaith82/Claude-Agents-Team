@@ -575,7 +575,7 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit = {
                 listOf(
                     tr("الكود") to rb, "Actions" to "$rb/actions", tr("الإصدارات") to "$rb/releases",
                     "Issues" to "$rb/issues", "Pull requests" to "$rb/pulls", tr("الإعدادات") to "$rb/settings",
-                    "Google" to "https://accounts.google.com"
+                    "Google" to "https://accounts.google.com", tr("محاكي Google") to "https://dda.omnidevicelab.google"
                 ).forEach { (label, url) ->
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.clickable { tab.session.loadUri(url) }) {
