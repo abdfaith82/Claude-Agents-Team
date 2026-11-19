@@ -42,6 +42,12 @@ fun trf(ar: String, vararg args: Any?): String = I18n.trf(ar, *args)
 /** قاموس الإنجليزية (المفتاح = النص العربي الأصلي). منفصل ليسهل اختباره بلا Compose. */
 object Translations {
     val EN: Map<String, String> = mapOf(
+        "الخوادم المحفوظة (اختر الدولة)" to "Saved servers (choose country)",
+        "اقطع الاتصال أولاً لتغيير الخادم." to "Disconnect first to change server.",
+        "إضافة خادم بدولة محددة" to "Add a server for a specific country",
+        "الاسم أو الدولة (مثل: 🇳🇱 هولندا)" to "Name or country (e.g. 🇳🇱 Netherlands)",
+        "خوادم مجانية بدولة تختارها" to "Free servers in a country you choose",
+        "Proton VPN المجاني (حساب مجاني بلا حد بيانات): ولّد ملف WireGuard لكل دولة متاحة من حسابك (مثل الولايات المتحدة وهولندا واليابان) وأضفه هنا باسم الدولة، ثم بدّل بينها بنقرة. الدول المجانية يحددها المزوّد وقد تتغير." to "Proton VPN Free (free account, no data cap): generate a WireGuard file for each country available on your account (e.g. US, Netherlands, Japan), add it here under the country name, then switch with one tap. The free countries are set by the provider and may change.",
         "جلب خادم مجاني (Cloudflare WARP)" to "Get a free server (Cloudflare WARP)",
         "⏳ جارٍ الجلب…" to "⏳ Fetching…",
         "جلب خادم مجاني" to "Get a free server",

@@ -112,22 +112,43 @@ object VpnHub {
     }
 }
 
+class VpnProfile(val name: String, val config: String)
+
 @Composable
 fun VpnTab(vm: RelayViewModel) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val storage = remember { Storage(ctx) }
-    var config by remember { mutableStateOf(runCatching { SecretStore.decrypt(storage.setting("vpn_config", "")) }.getOrDefault("")) }
+    val profiles = remember {
+        mutableStateListOf<VpnProfile>().apply {
+            runCatching {
+                val arr = org.json.JSONArray(SecretStore.decrypt(storage.setting("vpn_profiles", "")))
+                for (i in 0 until arr.length()) arr.getJSONObject(i).let { add(VpnProfile(it.getString("n"), it.getString("c"))) }
+            }
+            if (isEmpty()) runCatching { SecretStore.decrypt(storage.setting("vpn_config", "")) }.getOrDefault("")
+                .takeIf { it.isNotBlank() }?.let { add(VpnProfile("WireGuard", it)) }
+        }
+    }
+    var sel by remember { mutableIntStateOf(storage.setting("vpn_sel", "0").toIntOrNull() ?: 0) }
+    if (sel !in profiles.indices) sel = 0
     var appOnly by remember { mutableStateOf(storage.setting("vpn_app_only", "1") == "1") }
+    var adding by remember { mutableStateOf(profiles.isEmpty()) }
+    var draft by remember { mutableStateOf("") }
+    var draftName by remember { mutableStateOf("") }
     var warpAsk by remember { mutableStateOf(false) }
     var warpBusy by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf(config.isEmpty()) }
-    var draft by remember { mutableStateOf("") }
     val up = VpnHub.state == Tunnel.State.UP
+    val config = profiles.getOrNull(sel)?.config ?: ""
 
-    fun saveConfig(text: String) {
-        config = text
-        storage.saveSetting("vpn_config", if (text.isEmpty()) "" else SecretStore.encrypt(text))
+    fun persistProfiles() {
+        val arr = org.json.JSONArray()
+        profiles.forEach { arr.put(JSONObject().put("n", it.name).put("c", it.config)) }
+        storage.saveSetting("vpn_profiles", if (profiles.isEmpty()) "" else SecretStore.encrypt(arr.toString()))
+        storage.saveSetting("vpn_sel", sel.toString())
+    }
+    fun addProfile(name: String, text: String) {
+        profiles.add(VpnProfile(name.trim().ifEmpty { "WireGuard " + (profiles.size + 1) }, text.trim()))
+        sel = profiles.size - 1; adding = false; draft = ""; draftName = ""; persistProfiles()
     }
 
     fun doConnect() { scope.launch { VpnHub.connect(ctx, config, appOnly) } }
@@ -148,7 +169,7 @@ fun VpnTab(vm: RelayViewModel) {
         confirmButton = { TextButton(onClick = {
             warpAsk = false; warpBusy = true; VpnHub.error = ""
             scope.launch {
-                VpnHub.fetchWarp().onSuccess { saveConfig(it.trim()); editing = false }
+                VpnHub.fetchWarp().onSuccess { addProfile("Cloudflare WARP", it) }
                     .onFailure { VpnHub.error = tr("تعذّر الجلب: ") + (it.message ?: it.javaClass.simpleName).take(120) }
                 warpBusy = false
             }
@@ -162,10 +183,10 @@ fun VpnTab(vm: RelayViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusDot(if (up) Brand.Green else MaterialTheme.colorScheme.outline, 12)
                     Text(if (up) tr("متصل") else tr("غير متصل"), style = MaterialTheme.typography.titleMedium)
+                    if (profiles.isNotEmpty()) Text(profiles[sel].name, style = MaterialTheme.typography.bodyMedium)
                 }
-                if (config.isEmpty()) {
+                if (profiles.isEmpty()) {
                     Text(tr("لم يُستورد ملف إعداد بعد."), style = MaterialTheme.typography.bodySmall)
-                    Button(enabled = !warpBusy, onClick = { warpAsk = true }) { Text(if (warpBusy) tr("⏳ جارٍ الجلب…") else tr("جلب خادم مجاني (Cloudflare WARP)")) }
                 } else {
                     Button(enabled = !VpnHub.busy, onClick = {
                         if (up) scope.launch { VpnHub.disconnect(ctx) }
@@ -180,6 +201,37 @@ fun VpnTab(vm: RelayViewModel) {
                 if (up) {
                     OutlinedButton(onClick = { scope.launch { VpnHub.exitIp = VpnHub.checkIp() } }) { Text(tr("فحص عنوان IP الظاهر")) }
                     if (VpnHub.exitIp.isNotEmpty()) SelectionContainer { Text("IP: " + VpnHub.exitIp, fontFamily = FontFamily.Monospace) }
+                }
+            }
+        }
+
+        SoftCard {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tr("الخوادم المحفوظة (اختر الدولة)"), style = MaterialTheme.typography.titleMedium)
+                profiles.forEachIndexed { i, p ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = i == sel, enabled = !up, onClick = { sel = i; persistProfiles() })
+                        Text(p.name, modifier = Modifier.weight(1f), maxLines = 1)
+                        TextButton(enabled = !up, onClick = { profiles.removeAt(i); if (sel >= profiles.size) sel = 0; persistProfiles() }) { Text(tr("حذف")) }
+                    }
+                }
+                if (up) Text(tr("اقطع الاتصال أولاً لتغيير الخادم."), style = MaterialTheme.typography.labelSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(enabled = !warpBusy, onClick = { warpAsk = true }) { Text(if (warpBusy) tr("⏳ جارٍ الجلب…") else tr("جلب خادم مجاني (Cloudflare WARP)")) }
+                }
+                OutlinedButton(onClick = { adding = !adding }) { Text(tr("إضافة خادم بدولة محددة")) }
+            }
+        }
+
+        if (adding) SoftCard {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(draftName, { draftName = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(tr("الاسم أو الدولة (مثل: 🇳🇱 هولندا)")) })
+                OutlinedTextField(draft, { draft = it }, label = { Text(tr("الصق محتوى ملف .conf")) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { filePicker.launch("*/*") }) { Text(tr("اختيار ملف")) }
+                    Button(enabled = draft.contains("[Interface]") && draft.contains("[Peer]"), onClick = { addProfile(draftName, draft) }) { Text(tr("حفظ")) }
                 }
             }
         }
@@ -201,31 +253,9 @@ fun VpnTab(vm: RelayViewModel) {
         }
 
         SoftCard {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tr("ملف إعداد WireGuard"), style = MaterialTheme.typography.titleMedium)
-                if (!editing && config.isNotEmpty()) {
-                    Text(tr("محفوظ ومشفّر على الجهاز (المفتاح الخاص لا يُعرض)."), style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { draft = ""; editing = true }) { Text(tr("استبدال")) }
-                        OutlinedButton(enabled = !up, onClick = { saveConfig(""); editing = true }) { Text(tr("حذف")) }
-                    }
-                } else {
-                    OutlinedTextField(draft, { draft = it }, label = { Text(tr("الصق محتوى ملف .conf")) },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { filePicker.launch("*/*") }) { Text(tr("اختيار ملف")) }
-                        Button(enabled = draft.contains("[Interface]") && draft.contains("[Peer]"), onClick = {
-                            saveConfig(draft.trim()); draft = ""; editing = false
-                        }) { Text(tr("حفظ")) }
-                    }
-                }
-            }
-        }
-
-        SoftCard {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(tr("من أين أحصل على إعداد مجاني؟"), style = MaterialTheme.typography.titleMedium)
-                Text(tr("التطبيق يحوي المحرك فقط ولا يوفّر خوادم. خياران شائعان مجانيان، تحقّق من شروطهما بنفسك: ١) Proton VPN المجاني: نزّل ملف WireGuard من حسابك. ٢) Cloudflare WARP: تولّد ملف WireGuard بأداة wgcf مفتوحة المصدر."),
+                Text(tr("خوادم مجانية بدولة تختارها"), style = MaterialTheme.typography.titleMedium)
+                Text(tr("Proton VPN المجاني (حساب مجاني بلا حد بيانات): ولّد ملف WireGuard لكل دولة متاحة من حسابك (مثل الولايات المتحدة وهولندا واليابان) وأضفه هنا باسم الدولة، ثم بدّل بينها بنقرة. الدول المجانية يحددها المزوّد وقد تتغير."),
                     style = MaterialTheme.typography.bodySmall)
                 Text(tr("احذر من خوادم VPN مجانية مجهولة؛ قد تسجّل وتبيع بياناتك. الـ VPN ينقل ثقتك من مزوّد الإنترنت إلى مزوّد الـ VPN."),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
