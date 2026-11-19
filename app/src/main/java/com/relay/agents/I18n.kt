@@ -42,6 +42,11 @@ fun trf(ar: String, vararg args: Any?): String = I18n.trf(ar, *args)
 /** قاموس الإنجليزية (المفتاح = النص العربي الأصلي). منفصل ليسهل اختباره بلا Compose. */
 object Translations {
     val EN: Map<String, String> = mapOf(
+        "جلب خادم مجاني (Cloudflare WARP)" to "Get a free server (Cloudflare WARP)",
+        "⏳ جارٍ الجلب…" to "⏳ Fetching…",
+        "جلب خادم مجاني" to "Get a free server",
+        "سيتصل التطبيق بخدمة Cloudflare WARP لتسجيل جهاز مجاني (واجهة غير رسمية قد تتوقف). يخفي نشاطك عن مزوّد الإنترنت لكنه لا يتيح اختيار دولة. المفتاح الخاص يُولَّد على جهازك ويُحفظ مشفّراً." to "The app will contact Cloudflare WARP to register a free device (unofficial API, may stop working). It hides your traffic from your ISP but cannot pick a country. The private key is generated on your device and stored encrypted.",
+        "تعذّر الجلب: " to "Fetch failed: ",
         "لم يُمنح إذن VPN" to "VPN permission was not granted",
         "متصل" to "Connected",
         "غير متصل" to "Disconnected",

@@ -25,7 +25,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.StringReader
+import java.net.HttpURLConnection
 import java.net.URL
+import org.json.JSONObject
+import com.wireguard.crypto.KeyPair
 
 /** نواة VPN: WireGuard الرسمية (GoBackend). لا تتضمن خوادم؛ تستورد أنت ملف إعداد من مزوّد تثق به. */
 object VpnHub {
@@ -77,6 +80,28 @@ object VpnHub {
         busy = false
     }
 
+
+    /** يسجّل جهازاً مجانياً في Cloudflare WARP (واجهة غير رسمية) ويبني ملف WireGuard. المفتاح الخاص يُولَّد محلياً. */
+    suspend fun fetchWarp(): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val kp = KeyPair()
+            val body = JSONObject().put("key", kp.publicKey.toBase64()).put("install_id", "").put("fcm_token", "")
+                .put("tos", java.time.Instant.now().toString()).put("model", "PC").put("serial_number", "").put("locale", "en_US").toString()
+            val c = URL("https://api.cloudflareclient.com/v0a2158/reg").openConnection() as HttpURLConnection
+            c.requestMethod = "POST"; c.connectTimeout = 12000; c.readTimeout = 15000; c.doOutput = true
+            c.setRequestProperty("Content-Type", "application/json")
+            c.setRequestProperty("User-Agent", "okhttp/3.12.1")
+            c.setRequestProperty("CF-Client-Version", "a-6.3-2158")
+            c.outputStream.use { it.write(body.toByteArray()) }
+            if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
+            val cfg = JSONObject(c.inputStream.bufferedReader().use { it.readText() }).getJSONObject("config")
+            val peerKey = cfg.getJSONArray("peers").getJSONObject(0).getString("public_key")
+            val addr = cfg.getJSONObject("interface").getJSONObject("addresses")
+            "[Interface]\nPrivateKey = ${kp.privateKey.toBase64()}\nAddress = ${addr.getString("v4")}/32, ${addr.getString("v6")}/128\nDNS = 1.1.1.1, 1.0.0.1\nMTU = 1280\n\n" +
+                "[Peer]\nPublicKey = $peerKey\nAllowedIPs = 0.0.0.0/0, ::/0\nEndpoint = engage.cloudflareclient.com:2408\n"
+        }
+    }
+
     /** عنوان IP الذي يراه العالم لهذا التطبيق (يستعلم من api.ipify.org عند الضغط فقط). */
     suspend fun checkIp(): String = withContext(Dispatchers.IO) {
         runCatching {
@@ -94,6 +119,8 @@ fun VpnTab(vm: RelayViewModel) {
     val storage = remember { Storage(ctx) }
     var config by remember { mutableStateOf(runCatching { SecretStore.decrypt(storage.setting("vpn_config", "")) }.getOrDefault("")) }
     var appOnly by remember { mutableStateOf(storage.setting("vpn_app_only", "1") == "1") }
+    var warpAsk by remember { mutableStateOf(false) }
+    var warpBusy by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(config.isEmpty()) }
     var draft by remember { mutableStateOf("") }
     val up = VpnHub.state == Tunnel.State.UP
@@ -114,6 +141,21 @@ fun VpnTab(vm: RelayViewModel) {
         }
     }
 
+    if (warpAsk) AlertDialog(
+        onDismissRequest = { warpAsk = false },
+        title = { Text(tr("جلب خادم مجاني")) },
+        text = { Text(tr("سيتصل التطبيق بخدمة Cloudflare WARP لتسجيل جهاز مجاني (واجهة غير رسمية قد تتوقف). يخفي نشاطك عن مزوّد الإنترنت لكنه لا يتيح اختيار دولة. المفتاح الخاص يُولَّد على جهازك ويُحفظ مشفّراً.")) },
+        confirmButton = { TextButton(onClick = {
+            warpAsk = false; warpBusy = true; VpnHub.error = ""
+            scope.launch {
+                VpnHub.fetchWarp().onSuccess { saveConfig(it.trim()); editing = false }
+                    .onFailure { VpnHub.error = tr("تعذّر الجلب: ") + (it.message ?: it.javaClass.simpleName).take(120) }
+                warpBusy = false
+            }
+        }) { Text(tr("متابعة")) } },
+        dismissButton = { TextButton(onClick = { warpAsk = false }) { Text(tr("إلغاء")) } }
+    )
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SoftCard {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -123,6 +165,7 @@ fun VpnTab(vm: RelayViewModel) {
                 }
                 if (config.isEmpty()) {
                     Text(tr("لم يُستورد ملف إعداد بعد."), style = MaterialTheme.typography.bodySmall)
+                    Button(enabled = !warpBusy, onClick = { warpAsk = true }) { Text(if (warpBusy) tr("⏳ جارٍ الجلب…") else tr("جلب خادم مجاني (Cloudflare WARP)")) }
                 } else {
                     Button(enabled = !VpnHub.busy, onClick = {
                         if (up) scope.launch { VpnHub.disconnect(ctx) }

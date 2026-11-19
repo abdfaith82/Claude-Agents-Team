@@ -86,7 +86,7 @@ class BrowserTab(val id: String, val ctxId: String, startUrl: String, env0: Stri
                 session: GeckoSession, url: String?,
                 perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>, hasUserGesture: Boolean
             ) {
-                if (url != null) { this@BrowserTab.url = url; BrowserHub.persist() }
+                if (url != null && BrowserHub.isWeb(url)) { this@BrowserTab.url = url; BrowserHub.persist() }
             }
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) { canBack = canGoBack }
             override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) { canFwd = canGoForward }
@@ -156,6 +156,9 @@ object BrowserHub {
     val envs = mutableStateListOf<SavedEnv>()
     val actions = mutableStateListOf<AgentAction>()
 
+    /** عناوين الويب فقط تُحفظ؛ about:blank وغيرها تُهمل كي لا تُفسد عنوان البيئة المحفوظ. */
+    fun isWeb(u: String?): Boolean = u != null && (u.startsWith("http://") || u.startsWith("https://"))
+
     fun savedOf(ctxId: String): SavedEnv? = envs.firstOrNull { it.ctxId == ctxId }
     fun isPinned(ctxId: String): Boolean = savedOf(ctxId)?.pinned == true
 
@@ -196,7 +199,7 @@ object BrowserHub {
     fun openAiStudio(ctx: Context) {
         if (savedOf(AI_STUDIO_CTX) == null) envs.add(SavedEnv(AI_STUDIO_CTX, "AI Studio", AI_STUDIO_URL, false))
         val open = tabs.firstOrNull { it.ctxId == AI_STUDIO_CTX }
-        if (open != null) select(open) else newTab(ctx, savedOf(AI_STUDIO_CTX)?.url ?: AI_STUDIO_URL, AI_STUDIO_CTX)
+        if (open != null) select(open) else newTab(ctx, savedOf(AI_STUDIO_CTX)?.url?.takeIf { isWeb(it) } ?: AI_STUDIO_URL, AI_STUDIO_CTX)
         persist()
     }
 
@@ -204,7 +207,7 @@ object BrowserHub {
     fun openApkOnline(ctx: Context) {
         if (savedOf(APKONLINE_CTX) == null) envs.add(SavedEnv(APKONLINE_CTX, "ApkOnline", APKONLINE_URL, false))
         val open = tabs.firstOrNull { it.ctxId == APKONLINE_CTX }
-        if (open != null) select(open) else newTab(ctx, savedOf(APKONLINE_CTX)?.url ?: APKONLINE_URL, APKONLINE_CTX)
+        if (open != null) select(open) else newTab(ctx, savedOf(APKONLINE_CTX)?.url?.takeIf { isWeb(it) } ?: APKONLINE_URL, APKONLINE_CTX)
         persist()
     }
 
@@ -286,14 +289,14 @@ object BrowserHub {
             val ea = JSONArray(st.setting("gecko_envs", "[]"))
             for (i in 0 until ea.length()) {
                 val o = ea.getJSONObject(i)
-                envs.add(SavedEnv(o.getString("ctx"), o.optString("name", "A"), o.optString("url", homeUrl), o.optBoolean("pinned")))
+                envs.add(SavedEnv(o.getString("ctx"), o.optString("name", "A"), o.optString("url", homeUrl).takeIf { isWeb(it) } ?: when (o.getString("ctx")) { APKONLINE_CTX -> APKONLINE_URL; AI_STUDIO_CTX -> AI_STUDIO_URL; else -> homeUrl }, o.optBoolean("pinned")))
             }
         }
         runCatching {
             val arr = JSONArray(st.setting("gecko_tabs", "[]"))
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val t = BrowserTab(o.getString("id"), o.getString("ctx"), o.optString("url", homeUrl), savedOf(o.getString("ctx"))?.name ?: o.optString("env", "A"))
+                val t = BrowserTab(o.getString("id"), o.getString("ctx"), (savedOf(o.getString("ctx"))?.url ?: o.optString("url", homeUrl)).takeIf { isWeb(it) } ?: homeUrl, savedOf(o.getString("ctx"))?.name ?: o.optString("env", "A"))
                 register(ctx, t, true)
                 t.session.loadUri(t.url)
             }
@@ -363,7 +366,7 @@ object BrowserHub {
             val arr = JSONArray()
             tabs.forEach { arr.put(JSONObject().put("id", it.id).put("ctx", it.ctxId).put("url", it.url).put("env", it.env)) }
             st.saveSetting("gecko_tabs", arr.toString())
-            tabs.forEach { t -> savedOf(t.ctxId)?.url = t.url }
+            tabs.forEach { t -> if (isWeb(t.url)) savedOf(t.ctxId)?.url = t.url }
             val ea = JSONArray()
             envs.forEach { ea.put(JSONObject().put("ctx", it.ctxId).put("name", it.name).put("url", it.url).put("pinned", it.pinned)) }
             st.saveSetting("gecko_envs", ea.toString())
