@@ -53,6 +53,9 @@ private const val TAG = "GeckoBrowser"
 private const val BRIDGE_URI = "resource://android/assets/bridge/"
 // بعض المواقع (مثل claude.ai) تعدّ إصدار المحرك المضمّن قديماً؛ نعرّف المتصفح بإصدار فايرفوكس حديث.
 private const val MODERN_UA = "Mozilla/5.0 (Android 14; Mobile; rv:145.0) Gecko/145.0 Firefox/145.0"
+const val AI_STUDIO_CTX = "env_aistudio"
+// التطبيق الذي حدّدته في AI Studio (بدون /u/N ليستخدم حسابك الافتراضي بعد تسجيل الدخول).
+const val AI_STUDIO_URL = "https://aistudio.google.com/apps/97f6253e-b0fa-450d-8a98-0084dc261076?showPreview=true"
 private const val BRIDGE_ID = "bridge@claudeagents.team"
 
 /** تبويب واحد: جلسة Gecko خاصة به، وبيئة تخزين (ctxId) منفصلة للكوكيز وتسجيل الدخول. */
@@ -184,6 +187,14 @@ object BrowserHub {
         tabs.filter { it.ctxId == e.ctxId }.forEach { close(it) }
         runtime?.storageController?.clearDataForSessionContext(e.ctxId)
         envs.remove(e)
+        persist()
+    }
+
+    /** تبويب Google AI Studio ببيئة مخصّصة محفوظة (تسجيل دخولك يبقى فيها). يعود للتبويب المفتوح إن وُجد. */
+    fun openAiStudio(ctx: Context) {
+        if (savedOf(AI_STUDIO_CTX) == null) envs.add(SavedEnv(AI_STUDIO_CTX, "AI Studio", AI_STUDIO_URL, false))
+        val open = tabs.firstOrNull { it.ctxId == AI_STUDIO_CTX }
+        if (open != null) select(open) else newTab(ctx, savedOf(AI_STUDIO_CTX)?.url ?: AI_STUDIO_URL, AI_STUDIO_CTX)
         persist()
     }
 
@@ -575,10 +586,10 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit = {
                 listOf(
                     tr("الكود") to rb, "Actions" to "$rb/actions", tr("الإصدارات") to "$rb/releases",
                     "Issues" to "$rb/issues", "Pull requests" to "$rb/pulls", tr("الإعدادات") to "$rb/settings",
-                    "Google" to "https://accounts.google.com", tr("محاكي Google") to "https://dda.omnidevicelab.google"
+                    "Google" to "https://accounts.google.com", "AI Studio" to "@aistudio"
                 ).forEach { (label, url) ->
                     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { tab.session.loadUri(url) }) {
+                        modifier = Modifier.clickable { if (url == "@aistudio") BrowserHub.openAiStudio(ctx) else tab.session.loadUri(url) }) {
                         Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                     }
                 }
@@ -706,4 +717,12 @@ fun GeckoBrowserTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit = {
             )
         }
     }
+}
+
+/** «محاكي» Google AI Studio: تبويب Gecko ببيئة مستقلة تسجّل الدخول فيها بحساب Google مرة واحدة وتبقى محفوظة. */
+@Composable
+fun AiStudioTab(vm: RelayViewModel, gh: GhConfig, onOpenChat: () -> Unit) {
+    val ctx = LocalContext.current
+    remember { BrowserHub.init(ctx, "https://github.com/${gh.owner}/${gh.repo}"); BrowserHub.openAiStudio(ctx); true }
+    GeckoBrowserTab(vm, gh, onOpenChat)
 }
