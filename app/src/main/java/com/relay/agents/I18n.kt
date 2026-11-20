@@ -42,6 +42,18 @@ fun trf(ar: String, vararg args: Any?): String = I18n.trf(ar, *args)
 /** قاموس الإنجليزية (المفتاح = النص العربي الأصلي). منفصل ليسهل اختباره بلا Compose. */
 object Translations {
     val EN: Map<String, String> = mapOf(
+        "القائمة فارغة حالياً، حاول لاحقاً." to "The list is empty right now, try later.",
+        "تعذّر جلب القائمة: " to "Could not fetch the list: ",
+        "لم يُمنح الإذن" to "Permission not granted",
+        "تطبيق OpenVPN غير متصل بعد، أعد المحاولة بعد ثوانٍ." to "OpenVPN app is not connected yet, retry in a few seconds.",
+        "اختيار دولة (OpenVPN · VPN Gate)" to "Choose a country (OpenVPN · VPN Gate)",
+        "خوادم عامة مجانية يديرها متطوعون، وتغطي دولاً كثيرة. تعمل عبر تطبيق «OpenVPN for Android» المجاني، والنفق هنا لكل الجهاز. لا تستخدمها للحسابات الحساسة." to "Free public servers run by volunteers, covering many countries. Works through the free “OpenVPN for Android” app, and the tunnel covers the whole device. Don't use it for sensitive accounts.",
+        "تثبيت OpenVPN for Android" to "Install OpenVPN for Android",
+        "ثبّتّه، تحقّق الآن" to "I installed it, check now",
+        "جلب الخوادم" to "Fetch servers",
+        "الحالة: %s" to "Status: %s",
+        "%s خادم · الأسرع ~%s Mbps" to "%s servers · fastest ~%s Mbps",
+        "جرّب خادماً آخر في نفس الدولة" to "Try another server in the same country",
         "الخوادم المحفوظة (اختر الدولة)" to "Saved servers (choose country)",
         "اقطع الاتصال أولاً لتغيير الخادم." to "Disconnect first to change server.",
         "إضافة خادم بدولة محددة" to "Add a server for a specific country",

@@ -223,6 +223,8 @@ fun VpnTab(vm: RelayViewModel) {
             }
         }
 
+        VpnGateCard()
+
         if (adding) SoftCard {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(draftName, { draftName = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
